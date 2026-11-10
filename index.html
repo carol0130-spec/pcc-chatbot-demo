@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>毒物中心衛教助手</title>
+<style>
+  /* Layout: two-column app shell — left brand/info rail (collapses to a top card on phone), right chat panel that fills the remaining height */
+  :root {
+    --bg: #F3F5F8;
+    --surface: #FFFFFF;
+    --surface-2: #EDF0F4;
+    --fg: #1A2433;
+    --muted: #5B6B7F;
+    --border: #DCE2EA;
+    --navy: #1B3A5C;
+    --navy-ink: #14293F;
+    --slate: #5B7C99;
+    --red: #B23A3A;
+    --red-bg: #FBECEC;
+    --red-border: #E3A9A9;
+    --accent-contrast: #FFFFFF;
+    --chip-bg: #EDF0F4;
+    --chip-fg: #27405A;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10161F;
+      --surface: #182332;
+      --surface-2: #1F2C3D;
+      --fg: #E7ECF3;
+      --muted: #9AAAC0;
+      --border: #2C3B50;
+      --navy: #3E6690;
+      --navy-ink: #2A4A6B;
+      --slate: #7E9DB8;
+      --red: #E08080;
+      --red-bg: #3A2425;
+      --red-border: #6B3838;
+      --accent-contrast: #0D1420;
+      --chip-bg: #1F2C3D;
+      --chip-fg: #BBD0E8;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10161F;
+    --surface: #182332;
+    --surface-2: #1F2C3D;
+    --fg: #E7ECF3;
+    --muted: #9AAAC0;
+    --border: #2C3B50;
+    --navy: #3E6690;
+    --navy-ink: #2A4A6B;
+    --slate: #7E9DB8;
+    --red: #E08080;
+    --red-bg: #3A2425;
+    --red-border: #6B3838;
+    --accent-contrast: #0D1420;
+    --chip-bg: #1F2C3D;
+    --chip-fg: #BBD0E8;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 20px;
+    min-height: 100%;
+  }
+  h1, h2, h3, .display { font-family: "Noto Serif TC", "Microsoft JhengHei", serif; }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  /* ---- Mobile top bar (hidden on desktop) ---- */
+  .mobile-bar {
+    display: none;
+    align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 14px;
+    padding-top: max(10px, env(safe-area-inset-top, 0px));
+    background: var(--navy); color: #fff;
+  }
+  .mobile-bar .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .mobile-bar .brand-text { min-width: 0; }
+  .mobile-bar .brand-text .t1 { font-size: 13px; font-weight: 700; line-height: 1.3; }
+  .mobile-bar .brand-text .t2 { font-size: 10.5px; color: #9BB3C8; }
+  .mobile-bar .avatar { width: 30px; height: 30px; font-size: 13px; }
+  .bar-actions { display: flex; gap: 7px; flex-shrink: 0; }
+  .info-toggle {
+    flex-shrink: 0; font-size: 11.5px; font-weight: 700; color: #fff;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3);
+    border-radius: 999px; padding: 7px 11px; font-family: inherit; cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .scrim {
+    position: fixed; inset: 0; background: rgba(10,16,24,.5);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 40;
+  }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+
+  /* ---- Sidebar ---- */
+  .sidebar { display: flex; flex-direction: column; gap: 14px; }
+  .brand-card {
+    background: var(--navy);
+    color: #EAF1F8;
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .brand-card .eyebrow { font-size: 12px; letter-spacing: .08em; color: #9BB3C8; margin: 0 0 6px; }
+  .brand-card h1 { font-size: 21px; margin: 0 0 8px; line-height: 1.35; }
+  .brand-card p { font-size: 13px; line-height: 1.6; color: #C6D5E4; margin: 0; }
+  .proto-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; color: #FDEBEB; background: rgba(214,69,69,.35);
+    border: 1px solid rgba(255,255,255,.25);
+    padding: 3px 9px; border-radius: 999px; margin-top: 12px;
+  }
+
+  .info-card, .topics-card, .stats-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .info-card h2, .topics-card h2, .stats-card h2 {
+    font-size: 14px; margin: 0 0 10px; color: var(--navy);
+    font-family: "Noto Sans TC", sans-serif; font-weight: 700;
+  }
+  .info-card dl { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .info-card dt { font-size: 12.5px; font-weight: 700; color: var(--fg); }
+  .info-card dd { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+
+  .topics-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+  .topics-card li { font-size: 12.5px; color: var(--chip-fg); background: var(--chip-bg); border-radius: 8px; padding: 7px 10px; }
+
+  .stats-card .stats-sub { font-size: 11.5px; color: var(--muted); margin: -4px 0 12px; line-height: 1.5; }
+  .stats-total { font-size: 22px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
+  .stats-total-label { font-size: 11.5px; color: var(--muted); margin-bottom: 12px; }
+  .stats-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    font-size: 12.5px; padding: 6px 0; border-bottom: 1px dashed var(--border);
+  }
+  .stats-row:last-child { border-bottom: none; }
+  .stats-row .n { font-weight: 700; color: var(--fg); }
+  .stats-highrisk { color: var(--red); font-weight: 700; }
+  .stats-subhead { font-size: 11.5px; font-weight: 700; color: var(--navy); margin: 14px 0 2px; }
+  .stats-subhead:first-of-type { margin-top: 4px; }
+  .stats-refresh {
+    margin-top: 12px; width: 100%; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    background: var(--chip-bg); color: var(--chip-fg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px; font-family: inherit;
+  }
+  .stats-refresh:hover { border-color: var(--slate); }
+  .stats-empty, .stats-loading, .stats-error { font-size: 12px; color: var(--muted); }
+
+  .real-stats-card .stats-sub { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .real-stats-card h3 { font-size: 13px; margin: 16px 0 6px; color: var(--navy); }
+  .rank-list { list-style: none; margin: 0; padding: 0; }
+  .rank-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--surface-2); font-size: 12.5px; }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-num {
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--surface-2); color: var(--slate); font-weight: 700; font-size: 11.5px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rank-row.rs-top .rank-num { background: var(--navy); color: #fff; font-size: 13px; }
+  .rank-row.rs-top .rank-label { font-weight: 700; color: var(--navy); }
+  .rank-label { flex: 1 1 auto; }
+  .rank-pct { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .rank-row.rs-top .rank-pct { color: var(--navy); font-weight: 700; }
+  .real-stats-footnote { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+  .sheet-handle { display: none; }
+  .sheet-close { display: none; }
+  @media (max-width: 880px) {
+    .brand-card { display: none; }
+    .sheet-handle { display: block; }
+    .sheet-close {
+      display: block; width: 100%; margin-bottom: 14px;
+      background: var(--surface-2); color: var(--navy); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+  }
+
+  /* ---- Chat panel ---- */
+  .chat-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    height: min(78vh, 760px);
+    min-height: 480px;
+    overflow: hidden;
+  }
+  .chat-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--navy); color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; flex-shrink: 0;
+  }
+  .chat-header .title { font-size: 14.5px; font-weight: 700; }
+  .chat-header .subtitle { font-size: 11.5px; color: var(--muted); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #3FA86B; display: inline-block; margin-right: 4px; }
+
+  .feedback-btn {
+    margin-left: auto; flex-shrink: 0; font-size: 11.5px; font-weight: 700;
+    color: var(--navy); background: var(--chip-bg); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .feedback-btn:hover { border-color: var(--slate); }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(10,16,24,.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 80;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: auto; }
+  .modal-box {
+    background: var(--surface); color: var(--fg); border-radius: 16px;
+    max-width: 360px; width: 100%; padding: 22px 20px 20px; position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  .modal-box h2 { font-size: 16px; color: var(--navy); margin: 0 0 10px; padding-right: 22px; }
+  .modal-box p { font-size: 13px; line-height: 1.6; color: var(--fg); margin: 0 0 18px; }
+  .modal-close {
+    position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border-radius: 50%;
+    border: none; background: var(--surface-2); color: var(--muted); font-size: 14px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit;
+  }
+  .modal-close:hover { color: var(--fg); }
+  .modal-link-btn {
+    display: block; text-align: center; background: var(--navy); color: #fff;
+    border-radius: 10px; padding: 11px 14px; font-size: 13.5px; font-weight: 700;
+    text-decoration: none; font-family: inherit;
+  }
+  .modal-link-btn:hover { background: var(--navy-ink); }
+
+  .messages {
+    flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .msg { display: flex; gap: 9px; max-width: 86%; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg .bubble-wrap { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .msg .mini-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+    background: var(--surface-2); color: var(--navy); margin-top: 2px;
+  }
+  .msg.user .mini-avatar { background: var(--navy); color: #fff; }
+  .bubble {
+    padding: 11px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.65;
+    background: var(--surface-2); color: var(--fg); white-space: pre-wrap;
+  }
+  .msg.user .bubble { background: var(--navy); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot .bubble { border-bottom-left-radius: 4px; }
+  .msg.bot .bubble.urgent {
+    background: var(--red-bg); border: 1px solid var(--red-border); color: var(--fg);
+  }
+  .source-tag { font-size: 11px; color: var(--muted); padding-left: 2px; }
+  .source-tag b { color: var(--slate); font-weight: 600; }
+
+  .category-tag {
+    display: inline-block; font-size: 10.5px; font-weight: 600; color: var(--chip-fg);
+    background: var(--chip-bg); border: 1px solid var(--border); border-radius: 999px;
+    padding: 2px 9px; margin-top: 4px;
+  }
+
+  .feedback-row { display: flex; align-items: center; gap: 8px; padding-left: 2px; margin-top: 2px; }
+  .feedback-row .fb-label { font-size: 11px; color: var(--muted); }
+  .feedback-row .fb-btn {
+    font-size: 13px; line-height: 1; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--muted); cursor: pointer; font-family: inherit;
+  }
+  .feedback-row .fb-btn:hover { border-color: var(--slate); color: var(--fg); }
+  .feedback-row .fb-btn.chosen { border-color: var(--navy); color: var(--navy); background: var(--chip-bg); }
+  .feedback-row .fb-btn:disabled { cursor: default; opacity: .55; }
+  .feedback-row .fb-done { font-size: 11px; color: var(--muted); }
+
+  .nickname-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 18px 0; font-size: 12px; color: var(--muted);
+  }
+  .field-group {
+    display: flex; align-items: center; gap: 8px; flex: 1 1 200px; min-width: 0; white-space: nowrap;
+  }
+  .field-group-narrow { flex: 1 1 160px; min-width: 150px; }
+  .nickname-row input, .nickname-row select {
+    flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+    font-size: 12.5px; background: var(--bg); color: var(--fg); font-family: inherit;
+  }
+  .nickname-row input:focus, .nickname-row select:focus { outline: 2px solid var(--slate); outline-offset: 1px; }
+  .nickname-row select { cursor: pointer; }
+  .nickname-row input.invalid, .nickname-row select.invalid { border-color: var(--red); outline: 2px solid var(--red); outline-offset: 1px; }
+  .required-mark { color: var(--red); font-size: 10.5px; margin-left: 2px; white-space: nowrap; }
+  .field-error {
+    display: none; padding: 4px 18px 0; font-size: 11.5px; color: var(--red);
+  }
+  .field-error.show { display: block; }
+  .update-badge { font-size: 10.5px; color: var(--muted); }
+
+  .typing { display: inline-flex; gap: 4px; padding: 13px 14px; background: var(--surface-2); border-radius: 14px; border-bottom-left-radius: 4px; }
+  .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); opacity: .5; animation: blink 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100% { opacity: .35; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+
+  .chips-row {
+    display: flex; flex-wrap: nowrap; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--border);
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+  }
+  .chip {
+    flex: 0 0 auto;
+    font-size: 12px; background: var(--chip-bg); color: var(--chip-fg); white-space: nowrap;
+    border: 1px solid var(--border); border-radius: 999px; padding: 7px 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  .chip:hover { border-color: var(--slate); }
+
+  .composer {
+    display: flex; gap: 9px; padding: 14px 18px; border-top: 1px solid var(--border);
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  }
+  .composer input {
+    flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px;
+    font-size: 13.5px; background: var(--bg); color: var(--fg); font-family: inherit;
+  }
+  .composer input:focus { outline: 2px solid var(--slate); outline-offset: 1px; }
+  .composer button {
+    background: var(--navy); color: #fff; border: none; border-radius: 10px; padding: 0 18px;
+    font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .composer button:active { background: var(--navy-ink); }
+  .disclaimer { font-size: 10.5px; color: var(--muted); padding: 0 18px 12px; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+
+  /* ---- Mobile layout overrides (kept last so they win the cascade) ---- */
+  @media (max-width: 880px) {
+    body { padding: 0; display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
+    .shell { display: block; flex: 1 1 auto; min-height: 0; max-width: none; width: 100%; min-width: 0; margin: 0; }
+    .mobile-bar { display: flex; flex: 0 0 auto; }
+
+    .sidebar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+      max-height: 85dvh; overflow-y: auto;
+      background: var(--bg);
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -10px 34px rgba(0,0,0,.28);
+      padding: 14px max(16px, env(safe-area-inset-right,0px)) max(18px, env(safe-area-inset-bottom,0px)) max(16px, env(safe-area-inset-left,0px));
+      transform: translateY(105%);
+      transition: transform .25s ease;
+    }
+    .sidebar.open { transform: translateY(0); }
+    .sidebar .sheet-handle {
+      display: block; width: 40px; height: 4px; border-radius: 4px;
+      background: var(--border); margin: 2px auto 12px;
+    }
+    .chat-panel { height: 100%; min-height: 0; border-radius: 0; border: none; }
+  }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+</head>
+<body>
+<div class="mobile-bar">
+  <div class="brand">
+    <div class="avatar">毒</div>
+    <div class="brand-text">
+      <div class="t1">毒物中心衛教助手</div>
+      <div class="t2" id="mobileBarSubtitle">展示原型・本機運作</div>
+    </div>
+  </div>
+  <div class="bar-actions">
+    <button type="button" class="info-toggle" id="statsToggleBtn">📊 統計</button>
+    <button type="button" class="info-toggle" id="infoToggleBtn">ℹ️ 關於</button>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sheet-handle"></div>
+    <button type="button" class="sheet-close" id="sheetCloseBtn">完成，返回對話 ✕</button>
+    <div class="stats-card" id="statsCard">
+      <h2>本月統計（即時）</h2>
+      <div class="stats-sub">僅統計本月（每月1日自動歸零重新累計，舊月份紀錄仍完整保留，可用下方「下載報表」取得），可作為正式月報表PDF的預覽；需要您分享連結時給予「可編輯」權限，數據才能累積。</div>
+      <div id="statsBody" class="stats-loading">載入中…</div>
+      <button type="button" class="stats-refresh" id="statsRefreshBtn">重新整理</button>
+      <button type="button" class="stats-refresh" id="statsDownloadBtn">下載報表（CSV）</button>
+      <div class="stats-sub" id="statsDownloadNote"></div>
+    </div>
+    <div class="brand-card">
+      <p class="eyebrow">臺北榮總 職業醫學及臨床毒物部</p>
+      <h1 class="display">毒物中心 AI 衛教助手</h1>
+      <p>以中心既有衛教內容為基礎的分流展示原型，民眾可先在這裡取得初步衛教資訊，高風險狀況會優先導向緊急就醫與專線轉介。</p>
+      <span class="proto-badge">● 展示原型・非正式上線版本</span>
+      <div class="update-badge" id="updateBadge"></div>
+    </div>
+
+    <div class="topics-card real-stats-card">
+      <h2>民眾上月（10月）實際諮詢主題分布</h2>
+      <div class="stats-sub">依中心實際案件資料庫統計（非本展示原型的模擬資料），依標註頻率排序，呈現排名與占比。</div>
+      <ol id="realStatsBody" class="rank-list"></ol>
+
+      <h3>10月整體中毒原因分布</h3>
+      <ol id="realReasonBody" class="rank-list"></ol>
+    </div>
+
+    <div class="info-card">
+      <h2>關於這個展示</h2>
+      <dl>
+        <div>
+          <dt>內容來源</dt>
+          <dd>中心既有衛教手冊、衛福部食藥署用藥安全公告、同行審查文獻彙整，皆為人工審核過之既有內容，非即時生成。</dd>
+        </div>
+        <div>
+          <dt>運作方式</dt>
+          <dd>採「關鍵字比對既有衛教內容庫」呈現答案，不連線外部AI服務，可於院內網路獨立部署。</dd>
+        </div>
+        <div>
+          <dt>資安／個資</dt>
+          <dd>不要求提供病歷號等身分查核資料；送出問題前需填寫姓名（非真實姓名查核，可用化名／代稱）、稱謂與所在縣市，連同對話主題分類與您給的回饋（讚／倒讚），僅用於中心內部統計與品質改善、了解地區分布，不作其他用途。</dd>
+        </div>
+        <div>
+          <dt>內容更新</dt>
+          <dd>由中心人員每月檢視一次內容庫，依新興個案類型新增主題，預計每月更新一次。</dd>
+        </div>
+        <div>
+          <dt>分流機制</dt>
+          <dd>偵測到自殺／自傷相關字詞時，優先顯示緊急就醫與轉介資訊，其餘才提供一般衛教內容。</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="topics-card">
+      <h2>本月熱門主題</h2>
+      <ul id="topicList"></ul>
+    </div>
+  </aside>
+
+  <main class="chat-panel">
+    <div class="chat-header">
+      <div class="avatar">毒</div>
+      <div>
+        <div class="title">毒物中心衛教助手</div>
+        <div class="subtitle"><span class="status-dot"></span>展示原型・本機運作</div>
+      </div>
+      <button type="button" class="feedback-btn" id="feedbackToggleBtn">💬 民眾回饋</button>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="chips-row" id="chipsRow"></div>
+
+    <div class="nickname-row">
+      <div class="field-group">
+        <span>姓名<span class="required-mark">＊必填</span></span>
+        <input id="nicknameBox" type="text" placeholder="例如：護理站A、王先生（非真實姓名）" maxlength="20" autocomplete="off" required />
+      </div>
+      <div class="field-group field-group-narrow">
+        <span>稱謂<span class="required-mark">＊必填</span></span>
+        <select id="titleSelect" required>
+          <option value="" disabled selected>請選擇</option>
+          <option value="先生">先生</option>
+          <option value="小姐">小姐</option>
+          <option value="不提供">不提供</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <span>所在縣市<span class="required-mark">＊必填</span></span>
+        <select id="countySelect" required>
+          <option value="" disabled selected>請選擇</option>
+          <optgroup label="直轄市">
+            <option value="臺北市">臺北市</option>
+            <option value="新北市">新北市</option>
+            <option value="桃園市">桃園市</option>
+            <option value="臺中市">臺中市</option>
+            <option value="臺南市">臺南市</option>
+            <option value="高雄市">高雄市</option>
+          </optgroup>
+          <optgroup label="市">
+            <option value="基隆市">基隆市</option>
+            <option value="新竹市">新竹市</option>
+            <option value="嘉義市">嘉義市</option>
+          </optgroup>
+          <optgroup label="縣">
+            <option value="新竹縣">新竹縣</option>
+            <option value="苗栗縣">苗栗縣</option>
+            <option value="彰化縣">彰化縣</option>
+            <option value="南投縣">南投縣</option>
+            <option value="雲林縣">雲林縣</option>
+            <option value="嘉義縣">嘉義縣</option>
+            <option value="屏東縣">屏東縣</option>
+            <option value="宜蘭縣">宜蘭縣</option>
+            <option value="花蓮縣">花蓮縣</option>
+            <option value="臺東縣">臺東縣</option>
+            <option value="澎湖縣">澎湖縣</option>
+            <option value="金門縣">金門縣</option>
+            <option value="連江縣">連江縣</option>
+          </optgroup>
+          <optgroup label="其他">
+            <option value="國外">國外</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+    <div class="field-error" id="profileError">請先填寫姓名、稱謂與所在縣市，才能送出問題。</div>
+
+    <form class="composer" id="composerForm">
+      <input id="inputBox" type="text" placeholder="輸入您的問題，例如：家人不小心吃到清潔劑怎麼辦？" autocomplete="off" />
+      <button type="submit">送出</button>
+    </form>
+    <div class="disclaimer">本功能僅提供一般衛教資訊，非醫療診斷。個人用藥或病情問題，請洽原處方醫療院所，或撥打本中心24小時專線 (02) 2871-7121。</div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="feedbackOverlay">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
+    <button type="button" class="modal-close" id="feedbackCloseBtn" aria-label="關閉">✕</button>
+    <h2 id="feedbackModalTitle">民眾意見回饋</h2>
+    <p>若您對這個衛教分流展示原型，或毒物中心的服務有任何建議、疑問，歡迎透過臺北榮總官方聯絡窗口與我們聯繫，將由專人協助回覆。</p>
+    <a class="modal-link-btn" href="https://www.pcc-vghtpe.tw/contact.htm" target="_blank" rel="noopener noreferrer">前往聯絡我們頁面 ↗</a>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var KB = [
+    {
+      id: "home-poison",
+      label: "居家中毒怎麼辦",
+      reportCategory: "臨床毒性作用",
+      keywords: ["居家","家裡","誤食","催吐","清潔劑","漂白水","殺蟑","中毒","樟腦丸","臭丸","電池","水管疏通"],
+      answer: "居家常見中毒物質包括浴廁清潔劑、漂白水、殺蟑劑、鈕扣電池、樟腦丸（臭丸）、強鹼性水管疏通劑、有機溶劑等，幼兒與長者因在家時間最長，是最容易誤食的族群。\n\n提醒：不建議自行催吐，錯誤的催吐方式可能造成吸入性肺炎，反而使病情惡化。正確做法是先確認誤食物質的名稱與包裝，立即撥打毒物中心24小時專線 (02) 2871-7121，或攜帶容器盡速就醫，由專業人員評估處置方式。\n如出現嗜睡、意識改變、心悸、嚴重嘔吐等不適症狀，應立即至急診求治，不要等待。",
+      source: "臺北榮總毒藥物防治諮詢中心《居家中毒怎麼辦》衛教手冊"
+    },
+    {
+      id: "child",
+      label: "小孩誤食怎麼辦",
+      reportCategory: "臨床毒性作用",
+      keywords: ["小孩","幼兒","兒童","寶寶","小朋友","吞","誤食"],
+      answer: "幼兒是居家中毒最常見的族群，常見狀況包括誤食鈕扣電池、樟腦丸、清潔劑、藥品等。\n\n請先確認孩子意識清楚、呼吸正常，保留誤食物品的包裝或殘留物，不要自行催吐，立即撥打毒物中心24小時專線 (02) 2871-7121，或攜帶孩子與物品盡速就醫。\n如出現嗜睡、意識改變、心悸、嚴重嘔吐等不適症狀，應立即至急診求治，不要等待。",
+      source: "臺北榮總毒藥物防治諮詢中心《居家中毒怎麼辦》衛教手冊"
+    },
+    {
+      id: "iron-gummy",
+      label: "鐵劑軟糖/機能性軟糖誤食",
+      reportCategory: "臨床毒性作用",
+      keywords: ["鐵劑","鐵補充","軟糖","機能性軟糖","維他命軟糖","維生素軟糖","膠原蛋白軟糖","日本軟糖","水果軟糖","鐵中毒","元素鐵"],
+      answer: "機能性軟糖（維生素、膠原蛋白、鐵質補充等）外觀和口感都接近糖果，幼兒不易分辨與一般零食的差異，一旦取得整包，可能短時間內吃下較多顆。以熱門日本鐵補充軟糖為例，每顆約含11毫克元素鐵，鐵中毒風險是以攝入的「元素鐵」劑量估算，而非軟糖顆數或總重量，須綜合考量孩童體重、實際食用數量與是否出現症狀，無法用單一顆數一概而論。\n\n早期症狀多為噁心、嘔吐、腹痛、腹瀉、活動力下降、臉色蒼白、冒冷汗；年紀小的孩子可能只表現出突然安靜不玩或持續哭鬧焦躁。鐵中毒具階段性變化，初期嘔吐腹痛看似改善後，仍可能出現較嚴重的全身性毒性反應，不要因症狀暫時緩解就掉以輕心。除了鐵中毒，軟糖較具韌性，學齡前兒童整顆吞食也可能嗆咳哽塞，若出現持續咳嗽、呼吸困難、無法發聲、嘴唇發紫，應立即送醫。\n\n發現誤食時不要驚慌、不要催吐，保留產品包裝，確認產品名稱成分、食用數量與時間、孩童體重、是否已出現症狀，再撥打毒物中心24小時專線 (02) 2871-7121 由專業人員評估；如出現持續或劇烈嘔吐、嗜睡、意識改變等症狀，應立即就醫。",
+      source: "李凱如，〈當鐵劑變成水果軟糖：熱門機能軟糖背後的兒童誤食風險〉，臺北榮總毒藥物防治諮詢中心民眾衛教專區，2026年7月2日"
+    },
+    {
+      id: "bubble-solution",
+      label: "自製泡泡液誤食/吸入",
+      reportCategory: "臨床毒性作用",
+      keywords: ["泡泡水","泡泡液","吹泡泡","自製泡泡","倒吸","嗆到","吸入","洗髮精","洗碗精"],
+      answer: "近期社群流行用洗髮精、洗碗精、糖加少量水自製泡泡液，液體比市售兒童泡泡水濃稠，孩子又要直接對著自製裝置吹氣，容易讓泡沫液直接接觸口腔與咽喉。少量誤食通常以局部刺激為主，可能出現噁心、嘔吐、喉嚨疼痛或刺激感、腹痛、腹瀉。\n\n更需要注意的是吹泡泡過程中的「倒吸」，幼兒吸吐控制尚不成熟，泡沫液突然入口可能反射性吸氣，使液體進入氣管，嚴重時可能引發化學性肺炎甚至呼吸窘迫，屬於可能影響生命的狀況。若孩子曾明顯嗆到或懷疑吸入，出現持續咳嗽、喘鳴或呼吸聲異常、呼吸變快或費力、嘴唇臉色發紫、精神活動力下降、持續或反覆嘔吐，應儘速就醫。\n\n若只是少量含入口中或吞下一點，意識清楚、沒有明顯嘔吐或吞嚥困難，可先清除口腔殘留並協助漱口，稍緩後可少量溫水或溫牛奶減輕刺激，並持續觀察。建議優先使用兒童市售泡泡水及原廠吹泡泡工具，若自製務必充分稀釋、避免使用洗碗機清潔劑或濃縮洗衣精等高濃度產品，並全程家長陪同。無法判斷成分或接觸量時，保留產品、記下時間與症狀，直接聯絡毒物中心24小時專線 (02) 2871-7121。",
+      source: "李凱如，〈吹泡泡也要注意！自製泡泡液誤食與吸入風險〉，臺北榮總毒藥物防治諮詢中心民眾衛教專區，2026年10月19日"
+    },
+    {
+      id: "food-spoilage",
+      label: "食物發霉/過期還能吃嗎",
+      reportCategory: "臨床毒性作用",
+      keywords: ["食物發霉","發霉","腐敗","變質","酸掉","壞掉的食物","食物壞掉","不新鮮","滋生細菌","食物過期","過期食物","過期的食物","保存不良","食物中毒","黴菌","長黴","發霉的","隔夜菜","放太久"],
+      answer: "如果您想了解的是食品保存期限、食品是否已經變質還能不能吃，或是想申訴檢舉食品標示不實、店家販售過期／不新鮮食品，這類食品安全諮詢與申訴案件，建議先撥打衛生福利部食品藥物管理署「1919全國食安專線」（服務時間平日8:00–18:00），會有專人協助說明與受理。\n\n但如果您（或家人）已經把發霉、腐敗、變質的食物吃下肚了，尤其已經出現腹瀉、嘔吐、腹痛、頭暈、發燒、畏寒等不舒服的症狀，這就屬於急性中毒的臨床評估範圍，不是單純食安申訴能處理的，請不要在家觀察等待，應立即撥打毒物中心24小時專線 (02) 2871-7121，或盡速前往最近的急診室，由專業人員評估處置。",
+      source: "衛生福利部食品藥物管理署「1919全國食安專線」服務說明；中心臨床團隊彙整（依2026年個案資料歸納，如誤食發霉花生、發霉饅頭、疑似腐敗食材等案例）"
+    },
+    {
+      id: "sedative-info",
+      label: "安眠藥安全嗎",
+      reportCategory: "藥物",
+      keywords: ["安眠藥","鎮靜劑","助眠藥","史蒂諾斯","使蒂諾斯","悠樂丁","樂平片","贊安諾","alprazolam","zolpidem","FM2","安眠","鎮靜安眠藥","苯二氮平"],
+      answer: "安眠藥（鎮靜安眠類藥物，如苯二氮平類／非苯二氮平類等）須經醫師評估後使用，服用期間應避免自行調整劑量、重複服用，也絕對不要和酒精併用——這類藥物併用酒精或一次服用過量，可能加成嗜睡、呼吸抑制等風險。\n\n若是規律服用卻覺得藥效不夠、沒有效果，應於回診時與醫師討論是否需要調整，不建議自行加重劑量或重複服用；也不要和他人共用藥物，並應放置在孩童與長輩不易取得的地方。\n\n如果是誤食、一次服用過量，或與酒精併用後出現嗜睡、意識不清、呼吸變慢等狀況，應立即撥打毒物中心24小時專線 (02) 2871-7121，或盡速送醫，不要在家觀察等待。",
+      source: "臺北榮總毒藥物防治諮詢中心用藥安全衛教彙整"
+    },
+    {
+      id: "painkiller-info",
+      label: "止痛藥安全嗎",
+      reportCategory: "藥物",
+      keywords: ["止痛藥","止痛藥物","止痛劑","普拿疼","acetaminophen","paracetamol","乙醯胺酚","panadol","NSAID","非類固醇消炎止痛藥","消炎止痛藥","ibuprofen","布洛芬","diclofenac","naproxen","服他寧","泰諾","止痛針"],
+      answer: "常見止痛藥大致分為兩類：乙醯胺酚類（如普拿疼成分acetaminophen／paracetamol）和非類固醇消炎止痛藥（NSAID，如ibuprofen、diclofenac等），兩者作用機轉不同，服用前最好先看清楚成分，避免和其他感冒藥、複方止痛藥重複使用同一種成分而不自知，造成不知不覺中過量。\n\n乙醯胺酚類若長期或大量服用超過建議劑量，可能造成肝臟損傷；NSAID類則可能刺激腸胃（如胃潰瘍、腸胃出血）或影響腎臟功能，尤其是本身有肝腎疾病、消化性潰瘍病史，或正在服用其他藥物（如抗凝血劑）的人，使用前應先諮詢醫師或藥師。若是嗎啡等鴉片類強效止痛藥，則須經醫師處方並密切監測，不可自行調整劑量。\n\n如果吃了止痛藥仍然不夠止痛，不建議自行增加劑量或縮短服藥間隔，應回診與醫師討論是否需要調整用藥；如果是不慎一次服用過量，或服用後出現噁心嘔吐、腹痛、皮膚或眼白變黃、意識改變等不適症狀，應立即撥打毒物中心24小時專線 (02) 2871-7121，或盡速送醫，不要在家觀察等待。",
+      source: "臺北榮總毒藥物防治諮詢中心用藥安全衛教彙整"
+    },
+    {
+      id: "weight-loss-injection",
+      label: "瘦瘦針安全嗎",
+      reportCategory: "藥物",
+      keywords: ["瘦瘦針","減重針","司美格魯肽","semaglutide","猛健樂","善纖達","胃纖素","腸泌素","打針減肥","tirzepatide","liraglutide"],
+      answer: "瘦瘦針（腸泌素類GLP-1受體促效劑）屬於處方用藥，國內核准用於體重控制的成分有 tirzepatide、semaglutide、liraglutide 三種，須經醫師評估後開立、藥師調劑，切勿透過網路或來路不明管道購買。\n\n食藥署公告指出，常見不良反應包含腸胃不適、低血糖、噁心嘔吐及注射部位不適，國外並有嚴重急性胰臟炎的安全警訊。若自行調整劑量或施打後出現不適，應立即聯絡原開立處方的醫療院所，或盡速就醫。",
+      source: "衛生福利部食品藥物管理署用藥安全公告"
+    },
+    {
+      id: "wrong-dose",
+      label: "吃錯藥/劑量吃多了",
+      reportCategory: "藥物",
+      keywords: ["吃錯藥","劑量","吃多","少吃","重複吃","忘記吃","醫囑","看錯","餵","餵錯","餵成","誤餵","誤服","誤將","服用成","喝成","變成","吃成","搞錯","弄錯","超過","超量","過量","多吃","多了","少了","毫升","滴管","藥水","倍量","mg","毫克","再吃","加吃","再加","加量","自己加","追加","睡不著","睡不着","沒效","没效","白天","晚上的藥","早上的藥","吃顛倒","時間吃錯","時間搞混"],
+      answer: "若是自己或家人平時固定服用／餵用的藥物，不慎用錯次數或劑量（例如一天該餵3次卻餵成4次、劑量餵多了、看錯醫囑），這類狀況最適合由熟悉病史與用藥內容的原處方醫療院所協助判斷，建議第一時間聯絡原本開立處方的診所或醫院藥師／醫師，說明實際服藥狀況（藥名、原本劑量、實際餵了多少）。\n\n如果是自己覺得藥效不夠（例如吃了安眠藥還睡不著）想再追加劑量，不建議自行加吃，藥物吸收需要時間，追加劑量容易造成隔天嗜睡、意識不清、跌倒等風險，並不會讓藥效立即變快，應於下次回診時與醫師討論劑量是否需要調整。\n\n如果是把早晚的藥吃顛倒了（例如晚上該吃的藥在白天吃、或白天的藥晚上吃），是否需要處理要看藥品種類而定：有些藥物（如安眠藥、鎮靜劑）白天服用可能造成嗜睡、影響開車或工作安全；有些藥物（如利尿劑）晚上服用可能導致夜間頻尿影響睡眠；也有藥物需配合飯前飯後或日夜節律服用才有效。建議聯絡原開立處方的診所或醫院藥師／醫師，告知實際吃錯的藥名與時間，確認是否需要調整、或下一次該如何補回正常時間。\n\n如出現嗜睡、意識改變、心悸、嚴重嘔吐等不適症狀，或劑量明顯超過數倍，應立即至急診求治，不要等待。",
+      source: "中心臨床團隊彙整（依2026年個案資料歸納，如抗生素藥水一日三次誤餵成四次等案例）"
+    },
+    {
+      id: "lab-testing",
+      label: "毒品/藥物怎麼驗",
+      reportCategory: "檢驗相關",
+      keywords: ["怎麼驗","檢驗","驗毒","毒品檢驗","藥物檢驗","驗尿","尿液篩檢","毛髮檢測","重金屬檢測","委驗","送驗","LC-MS","藥物篩檢","驗血","膽鹼酯酶","百草枯檢驗"],
+      answer: "中心的檢驗服務（如尿液藥物篩檢、重金屬檢測、LC-MS/MS特殊藥物分析等）屬於「院外委驗」性質，原則上須由醫療院所開立醫囑單、經本部醫師會診後安排送檢，並非民眾可直接臨櫃申請的項目；如為毛髮或重金屬檢測，採樣前也需先聯絡本部取得採樣注意事項與專用容器，中心不提供廠商產品鑑定服務。\n\n詳細檢驗項目、申請流程與聯絡方式，請參考中心官網「檢驗服務」頁面：https://wd.vghtpe.gov.tw/CT/Fpage.action?muid=3&fid=1055#檢驗服務，或撥打毒物中心24小時專線 (02) 2871-7121 由專人協助說明。",
+      source: "臺北榮總職業醫學及臨床毒物部官網「檢驗服務」頁面；職業醫學及臨床毒物部院外委驗申請單"
+    },
+    {
+      id: "antidote",
+      label: "解毒劑是什麼/哪裡找",
+      reportCategory: "解毒劑相關",
+      keywords: ["解毒劑","解毒藥","抗蛇毒血清","蛇毒血清","解毒劑儲備","哪裡有解毒劑","哪家醫院有解毒劑","解毒劑查詢","血清哪裡找"],
+      answer: "解毒劑並非每一種中毒都有對應藥物，是否需要使用，也須由醫師依中毒物質種類、嚴重程度與暴露時間等綜合評估，並不是家中常備解毒劑就能自行處理中毒，使用不當反而可能有風險。\n\n若想查詢鄰近醫院是否備有特定解毒劑（如毛地黃解毒劑、納洛酮、抗蛇毒血清等）及庫存狀況，可至衛生福利部「全國解毒劑儲備網」依縣市／鄉鎮查詢：https://www.pcc-vghtpe.tw/stocking/，網站上的庫存數字為擷取當下資料，實際用藥前仍建議先致電該院確認，或撥打毒物中心24小時專線 (02) 2871-7121，由專人協助評估與聯繫轉介。",
+      source: "衛生福利部全國解毒劑儲備網（由臺北榮總毒藥物防治諮詢中心維護）"
+    },
+    {
+      id: "clinic-registration",
+      label: "門診掛號怎麼掛",
+      reportCategory: "其他",
+      keywords: ["掛號","門診","看診","初診","複診","預約掛號","網路掛號","門診時間","掛哪一科","看哪一科","門診掛號","預約看診","夜間門診","現場掛號","掛幾號","約診","改期"],
+      answer: "如果是想掛本部（職業醫學及臨床毒物部）門診追蹤或諮詢，可先參考本部官網「門診資訊」頁面，確認看診時段與相關說明：https://wd.vghtpe.gov.tw/CT/Fpage.action?muid=4&fid=1056。\n\n實際掛號（含初診、複診預約，查詢醫師與門診時段、掛號查詢與取消等）請使用臺北榮總網路掛號系統：https://www6.vghtpe.gov.tw/reg/home.do，24小時皆可預約；如不熟悉操作，也可改用人工或語音電話掛號。若臨時無法就診，請記得提前取消，一個月內累計缺診達3次（含）以上，當月將暫停預約掛號資格，須親自到掛號櫃台辦理。\n\n如果是緊急中毒狀況，不需要透過門診掛號，請直接撥打毒物中心24小時專線 (02) 2871-7121，或立即前往最近的急診室。",
+      source: "臺北榮總職業醫學及臨床毒物部官網「門診資訊」頁面；臺北榮總網路掛號系統"
+    },
+    {
+      id: "ai-search",
+      label: "網路/AI查到的資訊準嗎",
+      reportCategory: "醫療諮詢",
+      keywords: ["chatgpt","gpt","gemini","網路查","估狗","google","ai","人工智慧","查到的資訊","準不準","準確","準嗎","可信","可靠","聊天機器人"],
+      answer: "很高興你已經先做了功課！不過毒物中心觀察到，民眾透過AI平台查到的中毒處理建議，常夾雜錯誤、過時甚至彼此矛盾的內容。例如曾有民眾誤食不明植物，AI建議「先催吐並大量喝牛奶中和毒性」，但事實上誤食任何物質都不建議自行催吐；也有民眾接觸具延遲毒性的化學藥劑，被AI告知「只需觀察即可，不必就醫」，但這類延遲性中毒往往需要儀器檢查與抽血追蹤才能判斷，並非單靠觀察就能掌握。\n\n中毒風險評估需綜合年齡、體重、暴露途徑、劑量與病史等因素動態判斷，不是單純「輸入問題、得到答案」就能完成。如果查到的資訊讓你擔心，建議直接撥打毒物中心24小時專線 (02) 2871-7121，由專責諮詢師依照您的實際狀況評估，會比持續上網查詢更準確也更快。",
+      source: "李凱如，〈人工智慧時代的中毒風險評估：24小時毒物中心守護您的安全〉，衛生福利部暨臺北榮總臨床毒藥物諮詢中心民眾衛教專區，2026年5月14日"
+    },
+    {
+      id: "contact",
+      label: "怎麼聯絡毒物中心",
+      reportCategory: "其他",
+      keywords: ["電話","聯絡","怎麼找","地址","服務時間","專線","官網"],
+      answer: "臺北榮總毒藥物防治諮詢中心提供24小時全天候電話諮詢服務，專線 (02) 2871-7121，服務內容包括中毒診斷治療諮詢、轉診、解毒劑供應、中毒物質檢驗分析等，可參閱官網：https://www.pcc-vghtpe.tw/。\n\n如遇緊急中毒狀況，建議直接撥打專線，或立即前往最近的急診室。",
+      source: "臺北榮總毒藥物防治諮詢中心服務簡介"
+    }
+  ];
+
+  var URGENT_KEYWORDS = ["自殺","自傷","想死","不想活","輕生","傷害自己","結束生命","活不下去","了結","會死","致死量","致死劑量","致命劑量","死亡劑量","吃多少會死","解脫","最毒","最致命","哪個毒","什麼毒最"];
+  var URGENT_REPLY = "我們很關心您現在的狀況。\n\n如果您或身邊的人正考慮用藥物傷害自己，請立即撥打 119 或前往最近的急診室；您也可以撥打 1995 生命線，或 1980 張老師專線，會有專人24小時陪伴您。\n\n這不是單純的用藥諮詢，請務必尋求立即的醫療與心理支持。";
+
+  // 鎮靜安眠類藥物 + 酒精併用，或一次服用大量顆數，兩者皆屬高風險組合，一律比照蓄意自殺/自傷走緊急轉介，不當作一般用藥諮詢回答
+  var SEDATIVE_WORDS = ["安眠藥","鎮靜劑","助眠藥","史蒂諾斯","使蒂諾斯","悠樂丁","樂平片","贊安諾","alprazolam","zolpidem","FM2"];
+  var ALCOHOL_WORDS = ["酒","喝酒","配酒","飲酒"];
+  var LARGE_QTY_RE = /([1-9]\d?)\s*(顆|粒|錠|片)/;
+  var URGENT_OD_REPLY = "安眠藥（鎮靜安眠類藥物）與酒精都會抑制中樞神經，兩者併用會加成嗜睡、呼吸抑制等風險，可能比單獨服用更危險，尤其是一次服用多顆、超出治療劑量的狀況。\n\n這不是單純的用藥諮詢，請立即撥打 119 或前往最近的急診室就醫，不要在家觀察等待。如果這是情緒上想傷害自己的衝動，也請撥打 1995 生命線或 1980 張老師專線，會有專人24小時陪伴您，您不需要獨自面對。";
+  function isUrgentOverdose(lower){
+    var hasSedative = SEDATIVE_WORDS.some(function(w){ return lower.indexOf(w.toLowerCase()) !== -1; });
+    if (!hasSedative) return false;
+    var hasAlcohol = ALCOHOL_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    var qtyMatch = lower.match(LARGE_QTY_RE);
+    var hasLargeQty = qtyMatch && parseInt(qtyMatch[1], 10) >= 10;
+    return hasAlcohol || hasLargeQty;
+  }
+
+  // 泛指「吃藥配酒會怎樣」這類問法，沒有指名特定藥物也沒有劑量，仍比照自殺/自傷走緊急轉介，不當作一般藥物交互作用衛教回答
+  var GENERIC_DRUG_WORDS = ["藥","服藥","用藥","吃藥","藥物","喝藥"];
+  function isGenericDrugAlcohol(lower){
+    var hasDrug = GENERIC_DRUG_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    var hasAlcohol = ALCOHOL_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    return hasDrug && hasAlcohol;
+  }
+
+  // 「一顆藥丸就能致命」(one pill can kill)：小孩誤食特定高毒性藥物，即使只有一顆，對兒童也可能致命，
+  // 且常延遲數小時才出現嚴重症狀，不能比照一般居家誤食在家觀察，一律比照高風險走緊急轉介
+  var CHILD_CONTEXT_WORDS = ["小孩","幼兒","孩子","寶寶","兒童","小朋友","孫子","孫女","女兒","兒子"];
+  var ONE_PILL_CAN_KILL_WORDS = [
+    "降血壓藥","血壓藥","脈優","冠達悅","硝苯地平","維拉帕米","verapamil","diltiazem","鈣離子通道阻斷劑",
+    "乙型阻斷劑","心得安","propranolol","metoprolol",
+    "降血糖藥","血糖藥","糖尿病藥","瑪爾胰","daonil","磺醯脲類",
+    "嗎啡","美沙酮","可待因","鴉片類","類鴉片","吩坦尼","fentanyl",
+    "三環抗憂鬱劑","抗憂鬱劑","抗憂鬱藥","抗鬱劑","抗鬱藥","憂鬱症藥",
+    "毛地黃","強心配醣體","digoxin",
+    "樟腦丸","樟腦油","薄荷腦油"
+  ];
+  var ONE_PILL_CAN_KILL_REPLY = "有些藥物即使小孩只吃到一顆（錠），對兒童來說劑量就可能致命，包括常見的降血壓藥（如鈣離子通道阻斷劑、乙型阻斷劑）、降血糖藥、嗎啡等鴉片類止痛藥、抗憂鬱藥、毛地黃強心藥、樟腦油／樟腦丸等。其中抗憂鬱藥又以較舊的三環抗憂鬱劑（TCA）對兒童心臟與中樞神經毒性最高，是典型的『一顆就有致命風險』藥物，其他類別（如常見的SSRI）相對風險較低，但家屬通常無法當下確認是哪一種，為安全起見仍建議一律比照高風險處理。這類藥物常常會延遲數小時後才出現嚴重症狀（如心律不整、心跳過慢、血壓下降、低血糖、呼吸抑制），現在看起來沒事不代表安全，不能在家觀察等待。\n\n請立即撥打毒物中心24小時專線 (02) 2871-7121，說明藥品名稱、劑量與孩子體重，並攜帶藥物包裝（或剩餘藥錠）與孩子一同盡速前往最近的急診，不要等出現症狀才就醫。";
+  function isChildOnePillCanKill(lower){
+    var hasChild = CHILD_CONTEXT_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    if (!hasChild) return false;
+    return ONE_PILL_CAN_KILL_WORDS.some(function(w){ return lower.indexOf(w.toLowerCase()) !== -1; });
+  }
+
+  // 小孩是特殊族群：藥物相關問題一律先判斷是否歸屬「一顆就有致命風險」的處理原則——
+  // 只要同時出現兒童字詞與任何藥物相關字詞（不論是家人的藥、藥名不明，或是已指名但不在上面高風險清單中的藥物，
+  // 例如安眠藥），因無法排除風險，一律比照一顆就有致命風險處理，而不是落到一般用藥衛教KB主題（如安眠藥安全嗎、吃錯藥/劑量吃多了）。
+  // 回覆內容強調「先找出藥物身分、評估意識與危險、盡速就醫、不要等待」，不直接假設是哪一類藥物，
+  // 和已指名特定高風險藥物的 isChildOnePillCanKill 分開處理、分開回覆。
+  var UNSPECIFIED_DRUG_WORDS = [
+    "我的藥","你的藥","他的藥","她的藥","媽媽的藥","爸爸的藥","阿公的藥","阿嬤的藥","爺爺的藥","奶奶的藥",
+    "外公的藥","外婆的藥","家裡的藥","家人的藥","大人的藥","藥罐","藥袋","一堆藥","好幾顆藥",
+    "不知道什麼藥","不知名的藥","不知道是什麼藥","不確定是什麼藥","不知道吃了什麼藥"
+  ];
+  var UNSPECIFIED_CHILD_DRUG_REPLY = "孩子誤食的藥物還不確定是哪一種、或吃到的藥物不在明確低風險清單時，不能假設它是安全的。許多常見藥物（例如降血壓藥、降血糖藥、嗎啡等鴉片類止痛藥、抗憂鬱藥、毛地黃強心藥、安眠藥等鎮靜安眠類藥物等）對兒童來說即使只吃到一顆（錠），劑量也可能致命或造成嗜睡、呼吸抑制等嚴重影響，而且往往要延遲數小時後才出現心律不整、心跳過慢、血壓下降、低血糖、呼吸抑制等嚴重症狀，現在看起來沒事不代表安全，不能在家觀察等待。\n\n請先確認孩子的意識與呼吸狀況，找出孩子可能吃到的藥物包裝、藥袋或剩餘藥錠，確認藥品名稱與可能吃下的顆數，撥打毒物中心24小時專線 (02) 2871-7121說明情況與孩子體重，並攜帶藥物與孩子一同盡速前往最近的急診，不要等出現症狀才就醫。";
+  // 判斷問題是否符合「吃錯藥/劑量吃多了」(wrong-dose) KB自己的判斷依據（例如餵錯、劑量、吃多、忘記吃等）——
+  // 代表藥物身分是已知的（本來就在吃、或正在給的藥，如退燒藥），問題在於劑量/時間用錯，屬於常規用藥情境，
+  // 和身分不明、無法排除風險的誤食不同，供下方兒童用藥的優先判斷共用。
+  function looksLikeDosingErrorMsg(lower){
+    var wrongDoseItem = null;
+    for (var w = 0; w < KB.length; w++){
+      if (KB[w].id === "wrong-dose"){ wrongDoseItem = KB[w]; break; }
+    }
+    return !!(wrongDoseItem && wrongDoseItem.keywords.some(function(k){ return lower.indexOf(k.toLowerCase()) !== -1; }));
+  }
+  function isChildUnspecifiedDrug(lower){
+    var hasChild = CHILD_CONTEXT_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    if (!hasChild) return false;
+    var hasUnspecifiedPhrase = UNSPECIFIED_DRUG_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    if (hasUnspecifiedPhrase) return true;
+    // 若該藥物本身不在上面的高風險清單中，且問題看起來是常規劑量/時間用錯（而非身分不明的誤食），
+    // 應優先交給 wrong-dose 原本的回覆處理，不一律升級。
+    if (looksLikeDosingErrorMsg(lower)) return false;
+    // 兒童＋任何藥物相關字詞，非常規劑量用錯情境，且未命中上面已指名高風險藥物清單，仍一律先比照高風險處理
+    return GENERIC_DRUG_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+  }
+
+  // 食品保存不良/過期已食入：這類問題常同時出現「中毒」字樣（如「會不會中毒」），
+  // 若單純用一般關鍵字計分，會被「居家中毒怎麼辦」(含「中毒」關鍵字) 搶走，
+  // 因此獨立成優先判斷，比照 one-pill-can-kill 的作法，優先於一般KB計分比對
+  var FOOD_SPOILAGE_WORDS = ["發霉","腐敗","變質","酸掉","壞掉","不新鮮","滋生細菌","保存不良","食物中毒","黴菌","長黴","隔夜","放太久","過期"];
+  var FOOD_SPOILAGE_EXCLUDE_WORDS = ["藥","藥物","藥品","藥水","藥錠","處方","膠囊","疫苗","保健食品","營養品"];
+  function isFoodSpoilageQuery(lower){
+    var hasSpoilage = FOOD_SPOILAGE_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    if (!hasSpoilage) return false;
+    var hasExcluded = FOOD_SPOILAGE_EXCLUDE_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    return !hasExcluded;
+  }
+
+  var FALLBACK_REPLY = "這個問題我目前的衛教資料庫還沒有收錄對應內容。請嘗試更換問題關鍵字，或來電毒物中心24小時專線 (02) 2871-7121，由專業諮詢師協助判斷。";
+
+  var messagesEl = document.getElementById("messages");
+  var chipsRow = document.getElementById("chipsRow");
+  var topicList = document.getElementById("topicList");
+  var form = document.getElementById("composerForm");
+  var input = document.getElementById("inputBox");
+  var sidebar = document.getElementById("sidebar");
+  var scrim = document.getElementById("scrim");
+  var infoToggleBtn = document.getElementById("infoToggleBtn");
+  var sheetCloseBtn = document.getElementById("sheetCloseBtn");
+  var nicknameBox = document.getElementById("nicknameBox");
+  var titleSelect = document.getElementById("titleSelect");
+  var countySelect = document.getElementById("countySelect");
+  var profileError = document.getElementById("profileError");
+  var updateBadge = document.getElementById("updateBadge");
+  var mobileBarSubtitle = document.getElementById("mobileBarSubtitle");
+  var feedbackToggleBtn = document.getElementById("feedbackToggleBtn");
+  var feedbackOverlay = document.getElementById("feedbackOverlay");
+  var feedbackCloseBtn = document.getElementById("feedbackCloseBtn");
+
+  // ---- 每月更新日期顯示 ----
+  var UPDATE_FREQ = "更新頻次：月 ｜ Designed by 李凱如";
+  if (updateBadge) updateBadge.textContent = UPDATE_FREQ;
+  if (mobileBarSubtitle) mobileBarSubtitle.textContent = "展示原型・" + UPDATE_FREQ;
+
+  // ---- 民眾上月（10月）實際諮詢主題分布：依案件資料庫「諮詢原因」欄位統計（案件層級、可複選），僅民眾身分、2026年10月 ----
+  var REAL_OCT_STATS = [
+    { cat: "藥物", n: 40 },
+    { cat: "檢驗相關", n: 21 },
+    { cat: "醫療諮詢", n: 14 },
+    { cat: "臨床毒性作用", n: 9 },
+    { cat: "其他", n: 1 },
+    { cat: "解毒劑相關", n: 1 }
+  ];
+  (function renderRealStats(){
+    var body = document.getElementById("realStatsBody");
+    if (!body) return;
+    var total = REAL_OCT_STATS.reduce(function(sum, d){ return sum + d.n; }, 0);
+    var html = "";
+    REAL_OCT_STATS.forEach(function(d, idx){
+      var isTop = idx === 0;
+      var rankMark = isTop ? '🥇' : (idx + 1);
+      var pct = total ? (d.n / total * 100).toFixed(1) : "0.0";
+      html += '<li class="rank-row' + (isTop ? ' rs-top' : '') + '">' +
+        '<span class="rank-num">' + rankMark + '</span><span class="rank-label">' + escapeHtml(d.cat) + '</span>' +
+        '<span class="rank-pct">' + pct + '%</span>' +
+      '</li>';
+    });
+    body.innerHTML = html;
+  })();
+
+  // ---- 10月整體（民眾575件）中毒原因分布：依案件資料庫「中毒原因」欄位統計（案件層級，單選三大類＋細項）----
+  // 低頻細項（非蓄意-職業引起10／蓄意-濫用6／蓄意-其他6／非蓄意-環境因素3／非蓄意-被下毒3／蓄意-未知3／未知2／非蓄意-未知1）合併為「其他原因」
+  var REAL_OCT_REASON_STATS = [
+    { cat: "非蓄意－一般意外", n: 319 },
+    { cat: "非蓄意－醫療意外", n: 69 },
+    { cat: "蓄意－醫療誤用", n: 28 },
+    { cat: "蓄意－自殺", n: 15 },
+    { cat: "副作用－西藥", n: 12 },
+    { cat: "副作用－食物", n: 12 },
+    { cat: "其他原因（職業引起、濫用、環境因素、被下毒等）", n: 34 }
+  ];
+  (function renderRealReasonStats(){
+    var body = document.getElementById("realReasonBody");
+    if (!body) return;
+    var total = REAL_OCT_REASON_STATS.reduce(function(sum, d){ return sum + d.n; }, 0);
+    var html = "";
+    REAL_OCT_REASON_STATS.forEach(function(d, idx){
+      var isTop = idx === 0;
+      var rankMark = isTop ? '🥇' : (idx + 1);
+      var pct = total ? (d.n / total * 100).toFixed(1) : "0.0";
+      html += '<li class="rank-row' + (isTop ? ' rs-top' : '') + '">' +
+        '<span class="rank-num">' + rankMark + '</span><span class="rank-label">' + escapeHtml(d.cat) + '</span>' +
+        '<span class="rank-pct">' + pct + '%</span>' +
+      '</li>';
+    });
+    body.innerHTML = html;
+  })();
+
+  // ---- 姓名／稱謂／所在縣市（皆為必填，僅存於本機瀏覽器，供統計使用；姓名僅用於展示原型分類，非真實身分查核） ----
+  try {
+    var savedNick = localStorage.getItem("pcc_demo_nickname");
+    if (savedNick && nicknameBox) nicknameBox.value = savedNick;
+  } catch (e) {}
+  if (nicknameBox) {
+    ["input","change"].forEach(function(evt){
+      nicknameBox.addEventListener(evt, function(){
+        try { localStorage.setItem("pcc_demo_nickname", nicknameBox.value.trim()); } catch (e) {}
+        if (nicknameBox.value.trim()) nicknameBox.classList.remove("invalid");
+        updateProfileErrorVisibility();
+      });
+    });
+  }
+  function currentNickname(){
+    var v = nicknameBox ? nicknameBox.value.trim() : "";
+    return v ? v.slice(0, 20) : "匿名";
+  }
+
+  try {
+    var savedTitle = localStorage.getItem("pcc_demo_title");
+    if (savedTitle && titleSelect) titleSelect.value = savedTitle;
+  } catch (e) {}
+  if (titleSelect) {
+    titleSelect.addEventListener("change", function(){
+      try { localStorage.setItem("pcc_demo_title", titleSelect.value); } catch (e) {}
+      if (titleSelect.value) titleSelect.classList.remove("invalid");
+      updateProfileErrorVisibility();
+    });
+  }
+  function currentTitle(){
+    return titleSelect ? titleSelect.value : "";
+  }
+
+  try {
+    var savedCounty = localStorage.getItem("pcc_demo_county");
+    if (savedCounty && countySelect) countySelect.value = savedCounty;
+  } catch (e) {}
+  if (countySelect) {
+    countySelect.addEventListener("change", function(){
+      try { localStorage.setItem("pcc_demo_county", countySelect.value); } catch (e) {}
+      if (countySelect.value) countySelect.classList.remove("invalid");
+      updateProfileErrorVisibility();
+    });
+  }
+  function currentCounty(){
+    return countySelect ? countySelect.value : "";
+  }
+
+  function updateProfileErrorVisibility(){
+    var stillMissing = !currentNicknameValue() || !currentTitle() || !currentCounty();
+    if (!stillMissing && profileError) profileError.classList.remove("show");
+  }
+  function currentNicknameValue(){
+    return nicknameBox ? nicknameBox.value.trim() : "";
+  }
+  function requireProfileFields(){
+    var missing = [];
+    if (!currentNicknameValue()){ missing.push("姓名"); if (nicknameBox) nicknameBox.classList.add("invalid"); }
+    if (!currentTitle()){ missing.push("稱謂"); if (titleSelect) titleSelect.classList.add("invalid"); }
+    if (!currentCounty()){ missing.push("所在縣市"); if (countySelect) countySelect.classList.add("invalid"); }
+    if (!missing.length) return true;
+    if (profileError){
+      profileError.textContent = "請先填寫" + missing.join("、") + "，才能送出問題。";
+      profileError.classList.add("show");
+    }
+    var firstInvalid = nicknameBox && nicknameBox.classList.contains("invalid") ? nicknameBox :
+      (titleSelect && titleSelect.classList.contains("invalid") ? titleSelect :
+      (countySelect && countySelect.classList.contains("invalid") ? countySelect : null));
+    if (firstInvalid) firstInvalid.focus();
+    return false;
+  }
+
+  // ---- 資料庫（用於每月報表：暱稱、諮詢主題分類、是否高風險轉介、回饋） ----
+  var dbNS = null;
+  // canWriteData: true=這個連結可以寫入資料庫／false=確定不行（例如僅檢視連結）／null=平台未告知，先樂觀嘗試
+  var canWriteData = null;
+  (function initDb(){
+    if (!window.claude || typeof window.claude.use !== "function") return;
+    window.claude.use("db").then(function(ns){ dbNS = ns; }).catch(function(){ dbNS = null; });
+    window.claude.use("user").then(function(userNS){
+      if (!userNS) return;
+      userNS.can("data.write").then(function(v){ canWriteData = v; }).catch(function(){});
+    }).catch(function(){});
+  })();
+  function logConsultation(fields){
+    if (!dbNS) return null;
+    var record = {
+      nickname: currentNickname(),
+      title: currentTitle() || "未填",
+      county: currentCounty() || "未填",
+      question: (fields.question || "").slice(0, 300),
+      kbTopicId: fields.kbTopicId || "none",
+      reportCategory: fields.reportCategory || "其他",
+      highRisk: !!fields.highRisk,
+      feedback: null,
+      createdAt: new Date().toISOString()
+    };
+    try {
+      return dbNS.collection("consultations").add(record).catch(function(){ return null; });
+    } catch (e) { return null; }
+  }
+
+  function openSheet(){ sidebar.classList.add("open"); scrim.classList.add("show"); }
+  function closeSheet(){ sidebar.classList.remove("open"); scrim.classList.remove("show"); }
+  if (infoToggleBtn) infoToggleBtn.addEventListener("click", openSheet);
+  if (scrim) scrim.addEventListener("click", closeSheet);
+  if (sheetCloseBtn) sheetCloseBtn.addEventListener("click", closeSheet);
+
+  // ---- 民眾回饋彈跳視窗 ----
+  function openFeedbackModal(){ if (feedbackOverlay) feedbackOverlay.classList.add("show"); }
+  function closeFeedbackModal(){ if (feedbackOverlay) feedbackOverlay.classList.remove("show"); }
+  if (feedbackToggleBtn) feedbackToggleBtn.addEventListener("click", openFeedbackModal);
+  if (feedbackCloseBtn) feedbackCloseBtn.addEventListener("click", closeFeedbackModal);
+  if (feedbackOverlay) feedbackOverlay.addEventListener("click", function(e){
+    if (e.target === feedbackOverlay) closeFeedbackModal();
+  });
+  document.addEventListener("keydown", function(e){
+    if (e.key === "Escape") closeFeedbackModal();
+  });
+
+  // ---- 本月統計（即時讀取資料庫，作為月報表PDF的預覽） ----
+  var statsToggleBtn = document.getElementById("statsToggleBtn");
+  var statsRefreshBtn = document.getElementById("statsRefreshBtn");
+  var statsDownloadBtn = document.getElementById("statsDownloadBtn");
+  var statsDownloadNote = document.getElementById("statsDownloadNote");
+  var statsBody = document.getElementById("statsBody");
+  var CATEGORY_ORDER = ["藥物","檢驗相關","醫療諮詢","解毒劑相關","臨床毒性作用","致癌性","哺乳及致畸胎毒性","其他"];
+  var lastStatsDocs = null;
+
+  // ---- 僅取「本月」(今天所在的西元年/月) 的紀錄，讓統計隨月份自動歸零；舊月份的紀錄仍完整保留在資料庫中，不會被刪除 ----
+  function currentYearMonth(){
+    var now = new Date();
+    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+  }
+  function isThisMonth(createdAt){
+    if (!createdAt) return false;
+    return String(createdAt).slice(0, 7) === currentYearMonth();
+  }
+  function filterThisMonth(docs){
+    return docs.filter(function(d){ return isThisMonth(d.createdAt); });
+  }
+
+  function renderStats(docs){
+    if (!docs.length){
+      statsBody.className = "stats-empty";
+      statsBody.textContent = "本月（" + currentYearMonth() + "）目前尚無任何紀錄。民眾開始使用並點選回饋後，這裡會即時顯示統計；每月1日會自動歸零重新累計，之前月份的紀錄仍完整保留，可用「下載報表」取得。";
+      return;
+    }
+    var byCategory = {}, up = 0, down = 0, noFb = 0, highRisk = 0;
+    var byGender = { "男": 0, "女": 0, "未知/其他": 0 };
+    var byCounty = {};
+    var TITLE_TO_GENDER = { "先生": "男", "小姐": "女" };
+    docs.forEach(function(d){
+      var cat = d.reportCategory || "其他";
+      byCategory[cat] = (byCategory[cat] || 0) + 1;
+      if (d.feedback === "up") up++;
+      else if (d.feedback === "down") down++;
+      else noFb++;
+      if (d.highRisk) highRisk++;
+
+      var gender = TITLE_TO_GENDER[d.title] || "未知/其他";
+      byGender[gender] = (byGender[gender] || 0) + 1;
+
+      var county = d.county || "未填";
+      byCounty[county] = (byCounty[county] || 0) + 1;
+    });
+
+    var html = "";
+    html += '<div class="stats-total">' + docs.length + ' 人次</div>';
+    html += '<div class="stats-total-label">本月（' + currentYearMonth() + '）諮詢總人次，每月1日自動歸零</div>';
+
+    html += '<div class="stats-subhead">依諮詢主題分類</div>';
+    CATEGORY_ORDER.forEach(function(cat){
+      if (byCategory[cat]){
+        html += '<div class="stats-row"><span>' + escapeHtml(cat) + '</span><span class="n">' + byCategory[cat] + '</span></div>';
+      }
+    });
+    Object.keys(byCategory).forEach(function(cat){
+      if (CATEGORY_ORDER.indexOf(cat) === -1){
+        html += '<div class="stats-row"><span>' + escapeHtml(cat) + '</span><span class="n">' + byCategory[cat] + '</span></div>';
+      }
+    });
+
+    html += '<div class="stats-subhead">依性別</div>';
+    ["男","女","未知/其他"].forEach(function(g){
+      html += '<div class="stats-row"><span>' + escapeHtml(g) + '</span><span class="n">' + (byGender[g] || 0) + '</span></div>';
+    });
+
+    html += '<div class="stats-subhead">依所在縣市</div>';
+    Object.keys(byCounty).sort(function(a, b){ return byCounty[b] - byCounty[a]; }).forEach(function(county){
+      html += '<div class="stats-row"><span>' + escapeHtml(county) + '</span><span class="n">' + byCounty[county] + '</span></div>';
+    });
+
+    html += '<div class="stats-subhead">使用回饋</div>';
+    html += '<div class="stats-row"><span>👍 有幫助</span><span class="n">' + up + '</span></div>';
+    html += '<div class="stats-row"><span>👎 沒幫到</span><span class="n">' + down + '</span></div>';
+    html += '<div class="stats-row"><span>未填回饋</span><span class="n">' + noFb + '</span></div>';
+    html += '<div class="stats-row"><span class="stats-highrisk">高風險轉介</span><span class="n stats-highrisk">' + highRisk + '</span></div>';
+
+    statsBody.className = "";
+    statsBody.innerHTML = html;
+  }
+
+  function loadStats(){
+    if (!statsBody) return;
+    if (!dbNS){
+      statsBody.className = "stats-error";
+      statsBody.textContent = "目前無法連線資料庫，可能是此連結僅有「檢視」權限、裝置離線，或展示版本尚未部署資料庫功能。您仍可向我索取用資料庫原始紀錄整理的月報表。";
+      return;
+    }
+    statsBody.className = "stats-loading";
+    statsBody.textContent = "載入中…";
+    dbNS.collection("consultations").limit(500).get().then(function(snap){
+      var docs = snap.docs.map(function(d){ return d.data() || {}; });
+      docs = filterThisMonth(docs);
+      lastStatsDocs = docs;
+      renderStats(docs);
+    }).catch(function(){
+      statsBody.className = "stats-error";
+      statsBody.textContent = "讀取統計時發生問題，請稍後按「重新整理」再試一次。";
+    });
+  }
+  if (statsToggleBtn) statsToggleBtn.addEventListener("click", function(){ openSheet(); loadStats(); });
+  if (statsRefreshBtn) statsRefreshBtn.addEventListener("click", loadStats);
+
+  function csvField(v){
+    var s = (v === null || v === undefined) ? "" : String(v);
+    if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function buildCsv(docs){
+    var rows = [["時間","姓名","稱謂","所在縣市","諮詢主題分類","內部主題代碼","是否高風險轉介","回饋","提問內容"]];
+    docs.forEach(function(d){
+      rows.push([
+        d.createdAt || "",
+        d.nickname || "匿名",
+        d.title || "未填",
+        d.county || "未填",
+        d.reportCategory || "其他",
+        d.kbTopicId || "",
+        d.highRisk ? "是" : "否",
+        d.feedback === "up" ? "有幫助" : (d.feedback === "down" ? "沒幫到" : "未填"),
+        d.question || ""
+      ].map(csvField).join(","));
+    });
+    return "﻿" + rows.join("\r\n");
+  }
+  if (statsDownloadBtn) statsDownloadBtn.addEventListener("click", function(){
+    if (statsDownloadNote) statsDownloadNote.textContent = "";
+    if (!dbNS){
+      if (statsDownloadNote) statsDownloadNote.textContent = "目前無法連線資料庫，無法下載，請先確認分享權限或改向我索取報表。";
+      return;
+    }
+    dbNS.collection("consultations").limit(1000).get().then(function(snap){
+      var docs = snap.docs.map(function(d){ return d.data() || {}; });
+      docs = filterThisMonth(docs);
+      lastStatsDocs = docs;
+      if (!docs.length){
+        if (statsDownloadNote) statsDownloadNote.textContent = "本月（" + currentYearMonth() + "）目前尚無任何紀錄可下載。";
+        return;
+      }
+      if (!window.claude || typeof window.claude.use !== "function"){
+        if (statsDownloadNote) statsDownloadNote.textContent = "此檢視環境不支援下載檔案功能。";
+        return;
+      }
+      window.claude.use("downloads").then(function(downloadsNS){
+        if (!downloadsNS){
+          if (statsDownloadNote) statsDownloadNote.textContent = "此檢視環境不支援下載檔案功能。";
+          return;
+        }
+        var csv = buildCsv(docs);
+        var filename = "毒物中心衛教助手_諮詢紀錄_" + currentYearMonth() + ".csv";
+        downloadsNS.save({ filename: filename, data: csv }).then(function(){
+          if (statsDownloadNote) statsDownloadNote.textContent = "已下載，可用 Excel 開啟整理成月報表。";
+        }).catch(function(e){
+          if (statsDownloadNote) statsDownloadNote.textContent = (e && e.code === "declined") ? "已取消下載。" : "下載時發生問題，請再試一次。";
+        });
+      }).catch(function(){
+        if (statsDownloadNote) statsDownloadNote.textContent = "此檢視環境不支援下載檔案功能。";
+      });
+    }).catch(function(){
+      if (statsDownloadNote) statsDownloadNote.textContent = "讀取資料時發生問題，請再試一次。";
+    });
+  });
+
+  KB.forEach(function(item){
+    var li = document.createElement("li");
+    li.textContent = item.label;
+    topicList.appendChild(li);
+
+    var chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip";
+    chip.textContent = item.label;
+    chip.addEventListener("click", function(){ handleUserMessage(item.label); });
+    chipsRow.appendChild(chip);
+  });
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, function(c){
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];
+    });
+  }
+
+  function addMessage(role, text, opts){
+    opts = opts || {};
+    var wrap = document.createElement("div");
+    wrap.className = "msg " + role;
+
+    var mini = document.createElement("div");
+    mini.className = "mini-avatar";
+    mini.textContent = role === "user" ? "您" : "毒";
+    wrap.appendChild(mini);
+
+    var bwrap = document.createElement("div");
+    bwrap.className = "bubble-wrap";
+
+    var bubble = document.createElement("div");
+    bubble.className = "bubble" + (opts.urgent ? " urgent" : "");
+    bubble.textContent = text;
+    bwrap.appendChild(bubble);
+
+    if (opts.source) {
+      var src = document.createElement("div");
+      src.className = "source-tag";
+      src.innerHTML = "<b>資料來源：</b>" + escapeHtml(opts.source);
+      bwrap.appendChild(src);
+    }
+
+    if (role === "bot" && opts.report) {
+      var catTag = document.createElement("div");
+      catTag.className = "category-tag";
+      catTag.textContent = "分類：" + opts.report.reportCategory + (opts.report.highRisk ? "・高風險轉介" : "");
+      bwrap.appendChild(catTag);
+
+      if (canWriteData === false) {
+        // 確定是僅檢視連結：不嘗試寫入（一定會失敗），直接誠實告知，不顯示會讓人誤以為有存檔的回饋按鈕
+        var viewOnlyNote = document.createElement("div");
+        viewOnlyNote.className = "fb-done";
+        viewOnlyNote.textContent = "此連結僅供檢視，這次對話不會列入正式統計。";
+        bwrap.appendChild(viewOnlyNote);
+      } else {
+        // canWriteData 為 true 或尚未知（null）時，樂觀嘗試寫入；若實際被拒絕，回饋按鈕按下後會誠實顯示「可能未成功存檔」
+        var docPromise = logConsultation(opts.report);
+
+        var fbRow = document.createElement("div");
+        fbRow.className = "feedback-row";
+        var fbLabel = document.createElement("span");
+        fbLabel.className = "fb-label";
+        fbLabel.textContent = "這個回答有幫助嗎？";
+        var upBtn = document.createElement("button");
+        upBtn.type = "button"; upBtn.className = "fb-btn"; upBtn.textContent = "👍";
+        var downBtn = document.createElement("button");
+        downBtn.type = "button"; downBtn.className = "fb-btn"; downBtn.textContent = "👎";
+        fbRow.appendChild(fbLabel);
+        fbRow.appendChild(upBtn);
+        fbRow.appendChild(downBtn);
+
+        function sendFeedback(value, chosenBtn){
+          upBtn.disabled = true; downBtn.disabled = true;
+          chosenBtn.classList.add("chosen");
+          var done = document.createElement("span");
+          done.className = "fb-done";
+          done.textContent = "感謝您的回饋 🙏";
+          fbRow.appendChild(done);
+          if (docPromise && docPromise.then) {
+            docPromise.then(function(ref){
+              if (ref && ref.update) {
+                ref.update({ feedback: value }).catch(function(){
+                  done.textContent = "已收到您的意見（此連結權限可能無法存檔，若需列入統計請洽護理站確認權限）。";
+                });
+              } else {
+                done.textContent = "已收到您的意見（此連結權限可能無法存檔，若需列入統計請洽護理站確認權限）。";
+              }
+            });
+          }
+        }
+        upBtn.addEventListener("click", function(){ sendFeedback("up", upBtn); });
+        downBtn.addEventListener("click", function(){ sendFeedback("down", downBtn); });
+        bwrap.appendChild(fbRow);
+      }
+    }
+
+    wrap.appendChild(bwrap);
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showTyping(){
+    var wrap = document.createElement("div");
+    wrap.className = "msg bot";
+    wrap.id = "typingMsg";
+    var mini = document.createElement("div");
+    mini.className = "mini-avatar";
+    mini.textContent = "毒";
+    wrap.appendChild(mini);
+    var t = document.createElement("div");
+    t.className = "typing";
+    t.innerHTML = "<span></span><span></span><span></span>";
+    wrap.appendChild(t);
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  function removeTyping(){
+    var el = document.getElementById("typingMsg");
+    if (el) el.remove();
+  }
+
+  function matchKB(text){
+    var lower = text.toLowerCase();
+    for (var u = 0; u < URGENT_KEYWORDS.length; u++){
+      if (lower.indexOf(URGENT_KEYWORDS[u].toLowerCase()) !== -1) return { urgent: true };
+    }
+    if (isUrgentOverdose(lower)) return { urgentOD: true };
+    if (isGenericDrugAlcohol(lower)) return { urgent: true };
+    if (isChildOnePillCanKill(lower)) return { onePillCanKill: true };
+    if (isChildUnspecifiedDrug(lower)) return { onePillCanKillUnspecified: true };
+    // 兒童＋常規劑量/時間用錯（已被上面排除升級），直接比照「吃錯藥/劑量吃多了」(wrong-dose) 處理，
+    // 避免落入下方通用關鍵字計分時被「小孩居家中毒」等泛用兒童主題的關鍵字搶走
+    var hasChildCtx = CHILD_CONTEXT_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+    if (hasChildCtx && looksLikeDosingErrorMsg(lower)){
+      var wrongDoseItem = null;
+      for (var d = 0; d < KB.length; d++){
+        if (KB[d].id === "wrong-dose"){ wrongDoseItem = KB[d]; break; }
+      }
+      if (wrongDoseItem) return { item: wrongDoseItem };
+    }
+    if (isFoodSpoilageQuery(lower)){
+      var foodItem = null;
+      for (var f = 0; f < KB.length; f++){
+        if (KB[f].id === "food-spoilage"){ foodItem = KB[f]; break; }
+      }
+      if (foodItem) return { item: foodItem };
+    }
+    var best = null, bestScore = 0;
+    KB.forEach(function(item){
+      var score = 0;
+      item.keywords.forEach(function(k){
+        if (lower.indexOf(k.toLowerCase()) !== -1) score++;
+      });
+      if (score > bestScore){ bestScore = score; best = item; }
+    });
+    return best ? { item: best } : { none: true };
+  }
+
+  function handleUserMessage(text){
+    text = text.trim();
+    if (!text) return;
+    if (!requireProfileFields()) return;
+    addMessage("user", text);
+    input.value = "";
+    showTyping();
+
+    var result = matchKB(text);
+    var delay = 650 + Math.random() * 450;
+    setTimeout(function(){
+      removeTyping();
+      if (result.urgent){
+        addMessage("bot", URGENT_REPLY, { urgent: true, report: { question: text, kbTopicId: "urgent-selfharm", reportCategory: "藥物", highRisk: true } });
+      } else if (result.urgentOD){
+        addMessage("bot", URGENT_OD_REPLY, { urgent: true, report: { question: text, kbTopicId: "urgent-overdose", reportCategory: "藥物", highRisk: true } });
+      } else if (result.onePillCanKill){
+        addMessage("bot", ONE_PILL_CAN_KILL_REPLY, { urgent: true, report: { question: text, kbTopicId: "urgent-onepill", reportCategory: "藥物", highRisk: true } });
+      } else if (result.onePillCanKillUnspecified){
+        addMessage("bot", UNSPECIFIED_CHILD_DRUG_REPLY, { urgent: true, report: { question: text, kbTopicId: "urgent-onepill-unspecified", reportCategory: "藥物", highRisk: true } });
+      } else if (result.item){
+        addMessage("bot", result.item.answer, { source: result.item.source, report: { question: text, kbTopicId: result.item.id, reportCategory: result.item.reportCategory, highRisk: false } });
+      } else {
+        addMessage("bot", FALLBACK_REPLY, { report: { question: text, kbTopicId: "none", reportCategory: "其他", highRisk: false } });
+      }
+    }, delay);
+  }
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    handleUserMessage(input.value);
+  });
+
+  // Opening message
+  setTimeout(function(){
+    addMessage("bot", "您好，我是毒物中心衛教助手展示原型。您可以點選下方常見問題，或直接輸入您的狀況，我會從中心的衛教資料庫中為您找出相關說明。");
+  }, 300);
+})();
+</script>
+</body>
+</html>
